@@ -14,7 +14,6 @@ def task(wallet):
     proxies = get_proxy(wallet)
     while True:
         try:
-
             address = wallet['wallet'].address
             chain = get_chain(43114)
             web3 = Web3(Web3.HTTPProvider(chain.rpc))
@@ -46,14 +45,49 @@ def task(wallet):
                                 "voteCount": userInfo['chill_factor']
                             }
 
+                            if int(userInfo['chill_factor']) == 0:
+                                break
+
                             resp = session.post('https://api-retro-9000.avax.network/api/vote/rounds/cm3tfqk550005irarqtv047hz/projects/cm479vkin0j53pq54alx8uwb3/vote', json=vote_power,proxies=proxies)
                             if resp.status_code == 200 or resp.status_code == 201:
                                 if json.loads(resp.content)['message'] == 'Voting successful!':
                                     logger.success(f'voting -> {address}')
+
+                                    resp = session.get('https://api-retro-9000.avax.network/api/vote/rounds/cm3tfqk550005irarqtv047hz/ballot', proxies=proxies)
+                                    if resp.status_code == 200 or resp.status_code == 201:
+                                        ballot = json.loads(resp.content)
+
+
+                                    resp = session.get('https://api-retro-9000.avax.network/api/vote/projects/cm479vkin0j53pq54alx8uwb3/vote', proxies=proxies)
+                                    if resp.status_code == 200 or resp.status_code == 201:
+                                        id = json.loads(resp.content)['data']['id']
+
+                                    obj = {
+                                        "votes": [
+                                            {
+                                                "voteId": id
+                                            }
+                                        ]
+                                    }
+
+                                    resp = session.post(
+                                        'https://api-retro-9000.avax.network/api/vote/rounds/cm3tfqk550005irarqtv047hz/confirm-votes',
+                                        json=obj, proxies=proxies)
+                                    if resp.status_code == 200 or resp.status_code == 201:
+                                        if json.loads(resp.content)['message'] == 'Votes confirmed!':
+                                            logger.success(f'votes -> {address}')
+                                        else:
+                                            logger.warning(f'unluck for {address}')
+                                    else:
+                                        if json.loads(resp.content)['message'] == 'You cannot confirm an already confirmed vote. Please remove confirmed votes from the list':
+                                            logger.success(f'votes -> {address}')
+
+                                        break
+
+
                                 else:
                                     logger.warning(f'unluck for {address}')
-
-                                break
+                                    break
         except Exception as e:
             logger.error(e)
 
